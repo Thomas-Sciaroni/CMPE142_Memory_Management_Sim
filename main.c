@@ -35,9 +35,9 @@ typedef struct _page_table {
     bool *present; // is the page swapped (TRUE if not swapped, FALSE if swapped)
 } page_table;
 
-bool add_translation(page_table *, int vir_page, int phsy_page);
+void add_translation(page_table *, int vir_page, int phys_page);
 
-bool remove_translation(page_table *, int vir_page);
+void remove_translation(page_table *, int vir_page);
 
 bool accessMemory(page_table *, main_mem *, int vir_page, char operation);
 
@@ -124,6 +124,7 @@ bool accessMemory(page_table *page_tb, main_mem *main_m, int vir_page, char oper
     if (operation == 'R') {
         //just read the data, no need to do anything with it
         int temp = main_m->pages[page_tb->translations[vir_page]].data;
+	main_m->pages[page_tb->translations[vir_page]].accessed = true;
         return true;
     } else if (operation == 'W') {
         main_m->pages[page_tb->translations[vir_page]].data = 1;
@@ -198,10 +199,64 @@ int unmodified_pages(main_mem *mem ){
 		if(mem->pages[i].dirty ==false && mem->pages[i].accessed == false){
 			//return page number if page is unmodified 
 			return i;
-		}}
+		}
 
 		else{
 			return -1;
 		}
+	}
 	
+}
+
+void add_translation(page_table *pt,int vir_page, int phys_page){
+	pt->translations[vir_page] = phys_page;
+	return;
+}
+
+void remove_translation(page_table *pt, int vir_page){
+	pt->translations[vir_page] = -1;
+	return;
+}
+
+void main_to_swap(page_table *pt, swap_mem *swap, main_mem *main,int index){
+	
+	int swap_index;
+
+	//find a free page in swap memory 
+	for(int i=0; i<1000; i++){
+		if(swap->p_id[i] == -1){
+			swap_index = i;
+			break;
+		}
+
+	}
+
+
+	//copy contents to swap memory
+	swap->p_id[swap_index] = main->p_id[index];
+	swap->vir_page[swap_index] = main->vir_page[index];
+	swap->pages[swap_index].data = main->pages[index].data;
+	swap->pages[swap_index].dirty = main->pages[index].dirty;
+	swap->pages[swap_index].accessed = main->pages[index].accessed;
+
+}
+
+void swap_to_main(page_table *pt, swap_mem *swap, main_mem *main, int index){
+	int main_index;
+	
+	//find free page in main memory
+	for(int i = 0; i<20; i++){
+		if(main->p_id[i] == -1){
+			main_index = i;
+			break;
+		}
+	}
+	
+	//copy contents to main memory
+	main->p_id[main_index] = swap->p_id[index];
+	main->vir_page[main_index] = swap->vir_page[index];
+	main->pages[main_index].data = swap->pages[index].data;
+	main->pages[main_index].dirty = swap->pages[index].dirty;
+	main->pages[main_index].accessed = swap->pages[index].accessed;
+
 }
