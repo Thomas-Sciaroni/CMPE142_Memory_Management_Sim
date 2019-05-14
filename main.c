@@ -13,6 +13,7 @@
 typedef struct _page_mem {
     int data;
     bool dirty;
+    bool accessed;
 } page_mem;
 
 typedef struct _main_mem {
@@ -47,6 +48,8 @@ void main_to_swap(page_table *, swap_mem *, main_mem *, int index);
 void swap_to_main(page_table *, swap_mem *, main_mem *, int index);
 
 void clear_pages(swap_mem *, main_mem *, int page_amt);
+
+int unmodified_pages(main_mem *);
 
 //void run_processes(char * file_name, void(*swag_alg))
 void FIFO_swap(char *file_name, main_mem *, swap_mem *swap);
@@ -185,4 +188,20 @@ bool allocateMemory(page_table *page_tb, swap_mem *swap_m, main_mem *main_m, int
         return false;
     }
 
+}
+
+//assumes you checked that all pages are taken first
+int unmodified_pages(main_mem *mem ){
+	int i = 0;
+	for(i; i<20; i++){
+		//tests if page has been modified 
+		if(mem->pages[i].dirty ==false && mem->pages[i].accessed == false){
+			//return page number if page is unmodified 
+			return i;
+		}}
+
+		else{
+			return -1;
+		}
+	
 }
