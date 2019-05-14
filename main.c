@@ -34,9 +34,9 @@ typedef struct _page_table {
     bool *present; // is the page swapped (TRUE if not swapped, FALSE if swapped)
 } page_table;
 
-bool add_translation(page_table *, int vir_page);
+bool add_translation(page_table *, int vir_page, int phsy_page);
 
-bool remove_translation(main_mem *, int page_amnt, int vir_page);
+bool remove_translation(page_table *, int vir_page);
 
 bool accessMemory(page_table *, main_mem *, int vir_page, char operation);
 
@@ -55,7 +55,7 @@ void LRU_swap(char *file_name, main_mem *, swap_mem *swap);
 
 void random_swap(char *file_name, main_mem *, swap_mem *swap);
 
-int main(){
+int main() {
 
     main_mem *main_memory = (main_mem *) (malloc(sizeof(main_mem)));
     main_memory->p_id = ((int *) malloc(sizeof(int) * PAGE_AMT));
@@ -89,6 +89,7 @@ void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory) 
     f = fopen(file_name, "r");
     int p_id, v_id;
     char operation;
+
     while (fgets(line, 100, f)) {
         token = strtok(line, " \t\n");
         incrementer = 0;
@@ -106,7 +107,7 @@ void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory) 
                 v_id = -1;
             };
             //DATA IS IN p_id
-
+            //initilize page table if new ID
 
             token = strtok(NULL, " \t\n");
         }
@@ -114,47 +115,74 @@ void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory) 
 }
 
 //only use for reading/writing
-bool accessMemory(page_table * page_tb, main_mem * main_m, int vir_page, char operation){
-    if(!(page_tb->present[vir_page] && page_tb->valid))
+bool accessMemory(page_table *page_tb, main_mem *main_m, int vir_page, char operation) {
+    if (!(page_tb->present[vir_page] && page_tb->valid[vir_page]))
         return false;
-    if(operation == 'R') {
+    if (operation == 'R') {
         //just read the data, no need to do anything with it
         int temp = main_m->pages[page_tb->translations[vir_page]].data;
         return true;
-    }
-    else if(operation == 'W'){
+    } else if (operation == 'W') {
         main_m->pages[page_tb->translations[vir_page]].data = 1;
         main_m->pages[page_tb->translations[vir_page]].dirty = true;
         return true;
-    }
-    else return false;
+    } else return false;
 }
 
 //only use for allocating and deallocate memory
 //Allocation: TRUE if allocated, FALSE if no memory OR modified pages left (SWAP MUST BE USED)
 //Allocation: SWAP occurs when all pages full but at least one page remains unmodified
-//De-allocation: TRUE if freed, FALSE if access was not granted or page is in SWAP
-/*
-bool allocateMemory(page_table * page_tb, swap_mem * swap_m, main_mem * main_m, int vir_page, char operation){
+//De-allocation: TRUE if freed, FALSE if access was not granted, or not found
+
+//TODO: CHECK PAGE TABLE FOR VALID TRANSLATION
+
+bool allocateMemory(page_table *page_tb, swap_mem *swap_m, main_mem *main_m, int vir_page, char operation) {
     int index = -1;
-    if(operation == 'A'){
-        for(int i = 0; i < PAGE_AMT; i ++){
-            if (main_m->p_id[i] == -1){
+    if (operation == 'A') {
+        for (int i = 0; i < PAGE_AMT; i++) {
+            if (main_m->p_id[i] == -1) {
                 main_m->p_id[i] = page_tb->p_id;
                 main_m->vir_page[i] = vir_page;
                 main_m->pages[i].dirty = false;
                 main_m->pages[i].data = 0;
+                add_translation(page_tb, vir_page, i);
                 return true;
-            }
-            else if(!(main_m->pages[i].dirty)){
+            } else if (!(main_m->pages[i].dirty)) {
                 index = i;
             }
         }
-        if(index > -1){
-
+        if (index > -1) {
+            main_to_swap(page_tb, swap_m, main_m, index);
+            main_m->p_id[index] = page_tb->p_id;
+            main_m->vir_page[index] = vir_page;
+            main_m->pages[index].dirty = false;
+            main_m->pages[index].data = 0;
+            add_translation(page_tb, vir_page, index);
+        } else return false;
+    } else if (operation == 'F') {
+        if(!(page_tb->valid[vir_page]))
+            return false;
+        for (int i = 0; i < PAGE_AMT; i++) {
+            if (main_m->p_id[i] == page_tb->p_id) {
+                main_m->p_id[i] = -1;
+                main_m->vir_page[i] = -1;
+                main_m->pages[i].dirty = false;
+                main_m->pages[i].data = 0;
+                remove_translation(page_tb,vir_page);
+                return true;
+            }
         }
-        else return false;
+        for (int i = 0; i < SWAP_MEMORY_AMT; i++) {
+            if (swap_m->p_id[i] == page_tb->p_id) {
+                swap_m->p_id[i] = -1;
+                swap_m->vir_page[i] = -1;
+                swap_m->pages[i].dirty = false;
+                swap_m->pages[i].data = 0;
+                remove_translation(page_tb,vir_page);
+                return true;
+            }
+        }
+        return false;
     }
-    else if(operation == 'F' || opeation == T)
+
 }
- */
