@@ -62,6 +62,8 @@ void LRU_swap(char *file_name, main_mem *, swap_mem *swap);
 
 void random_swap(char *file_name, main_mem *, swap_mem *swap);
 
+bool main_full(main_mem *);
+
 int main() {
 
     main_mem *main_memory = (main_mem *) (malloc(sizeof(main_mem)));
@@ -329,4 +331,13 @@ void swap_to_main(page_table *pt, swap_mem *swap, main_mem *main, int index){
 	main->pages[main_index].dirty = swap->pages[index].dirty;
 	main->pages[main_index].accessed = swap->pages[index].accessed;
 
+}
+
+bool main_full(main_mem *main){
+	for(int i = 0; i<PAGE_AMT; i++){
+		if(mem->p_id[i] == -1)
+			return false;
+		else 
+			return true;
+	}
 }
