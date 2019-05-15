@@ -381,6 +381,9 @@ void remove_translation(process_list *pl, int PID,  int vir_page){
 void swapDirty(process_list *pl, node_sm * swapHead, main_mem *main, int PID1, int virPage1, int PID2, int virPage2, int main_index){
     int tmpData = main->data[main_index];
     bool tmpInSwap = main->inSwap[main_index];
+    remove_translation(pl, PID1, virPage1);
+    add_translation(pl, PID1, virPage1, main_index);
+    remove_translation(pl, PID2, virPage2);
 
     process_list * currentPL = pl;
     while(currentPL->next->pageTable->p_id != PID1){
@@ -411,7 +414,43 @@ void swapDirty(process_list *pl, node_sm * swapHead, main_mem *main, int PID1, i
         }
         oldpage->data.data = tmpData;
     }
-    else { //No old page, juSMst create a new entry in swap linked list
+    else { //No old page, just create a new entry in swap linked list
+        node_sm * cur = swapHead;
+        while ((cur->next != NULL)) {
+            cur = cur->next;
+        }
+        cur->next = malloc(sizeof(node_sm));
+        cur->next->data.data = tmpData;
+        cur->next->next = NULL;
+    }
+}
+
+void swapClean(process_list *pl, node_sm * swapHead, main_mem *main, int PID, int vir_page, int main_index){
+    int tmpData = main->data[main_index];
+    int tmpPID = main->p_id[main_index];
+    int tmpVP = main->vir_page[main_index];
+    bool tmpInSwap = main->inSwap[main_index];
+
+    remove_translation(pl, PID, vir_page);
+    add_translation(pl, PID, vir_page, main_index);
+    remove_translation(pl, tmpPID, tmpVP);
+
+    process_list * currentPL = pl;
+    while(currentPL->next->pageTable->p_id != PID){
+        currentPL = currentPL->next;
+    }
+    node_t * pt1 = currentPL->next->pageTable->head;
+
+    node_sm * current = swapHead;
+    while( (current->next != NULL) && !( (current->data.p_id == PID) && (current->data.vir_page == vir_page) ) ){
+        current = current->next;
+    }
+    main->data[main_index] = current->data.data;
+    main->dirty[main_index] = false;
+    main->accessed[main_index] = false;
+    main->inSwap[main_index] = true;
+
+    if(!tmpInSwap){ //No old page, just create a new entry in swap linked list
         node_sm * cur = swapHead;
         while ((cur->next != NULL)) {
             cur = cur->next;
