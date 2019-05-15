@@ -71,9 +71,14 @@ int main() {
 
 
     page_table *pt = (page_table *) (malloc(sizeof(page_table) * SWAP_MEMORY_AMT));
+
     
     for(int i = 0; i<SWAP_MEMORY_AMT; i++){
 	    swap_memory->p_id[i] = -1;
+	    //initialize the page tables variables 
+	    pt[i]->translations = ((int *) malloc(sizeof(int)*PAGE_AMT));
+	    pt[i]->valid = ((bool *) malloc(sizeof(bool) * PAGE_AMT));
+	    pt[i]->present = ((bool *) malloc(sizeof(bool) * PAGE_AMT));
 	    pt[i].p_id = -1;
     }
     for(int i =0; i<PAGE_AMT; i++){
@@ -165,6 +170,16 @@ void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory, 
 			if(success){
 				continue;
 			}
+		
+		else{
+			//swap function 
+			//find random page number in main memory
+			int num = (rand() % 20);
+			main_to_swap(pt,swap_memory,main_memory,num);
+			main_memory->p_id[num] = p_id;
+			main_memory->vir_page = v_id;
+			
+		}
 		}
 
 	}
