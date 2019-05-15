@@ -56,7 +56,7 @@ void clear_pages(swap_mem *, main_mem *, int page_amt);
 int unmodified_pages(main_mem *);
 
 //void run_processes(char * file_name, void(*swag_alg))
-void FIFO_swap(char *file_name, main_mem *, swap_mem *swap);
+void FIFO_swap(char *file_name, main_mem *, swap_mem *swap, page_table *);
 
 void LRU_swap(char *file_name, main_mem *, swap_mem *swap);
 
@@ -69,10 +69,6 @@ int main() {
     main_memory->vir_page = ((int *) malloc(sizeof(int) * PAGE_AMT));
     main_memory->pages = ((page_mem *) malloc(sizeof(page_mem) * PAGE_AMT));
 
-    swap_mem *swap_memory = (swap_mem *) (malloc(sizeof(swap_mem)));
-    swap_memory->p_id = ((int *) malloc(sizeof(int) * SWAP_MEMORY_AMT));
-    swap_memory->vir_page = ((int *) malloc(sizeof(int) * SWAP_MEMORY_AMT));
-    swap_memory->pages = ((page_mem *) malloc(sizeof(page_mem) * SWAP_MEMORY_AMT));
 
     page_table *pt = (page_table *) (malloc(sizeof(page_table) * SWAP_MEMORY_AMT));
     
@@ -98,7 +94,7 @@ int main() {
 
 }
 
-void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory) {
+void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory, page_table *pt) {
     char line[100];
     char *token;
     FILE *f;
@@ -132,11 +128,45 @@ void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory) 
 		//check if operation is creation of process
 		if(operation == 'C'){
 			//create page table for process
-			
+			for(int i =0; i<SWAP_MEMORY_AMT; i++){
+				if(pt[i].p_id != -1){
+					pt[i].p_id = p_id;
+				}
+			}
 		}
 		else{
+			for(int i = 0; i<PAGE_AMT; i++){
+				if(main_memory->p_id[i] == p_id){
+					main_memory->p_id[i] = -1;
+					main_memory->pages[i].data =-1;
+					main_memory->pages[i].dirty =false;
+					main_memory->pages[i].accessed = false;
 
+				}
+			}
+			for(int i = 0; i<SWAP_MEMORY_AMT; i++){
+				if(pt[i].p_id = p_id){
+					pt[i].p_id = -1;
+					pt[i].valid = false;
+					pt[i].present = false;
+				}
+			}
 		}
+	}
+	else{
+		if(operation == 'W' || operation == 'R'){
+			bool access = accessMemory(pt,main_memory,v_id,operation);
+			if (access){
+				continue;
+			}
+		}
+		else if(operation == 'A' || operation == 'F'){
+			bool success = allocateMemory(pt, swap_memory,main_memory,v_id, operation);
+			if(success){
+				continue;
+			}
+		}
+
 	}
 
     }
