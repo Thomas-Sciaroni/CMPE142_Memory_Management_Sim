@@ -78,6 +78,8 @@ bool freeMemory(page_table *, node_sm *, main_mem *, int vir_page);
 
 void swap(page_table *pt, node_sm *head, main_mem *main, int vir_page, int main_index);
 
+void
+
 
 //void run_processes(char * file_name, void(*swag_alg))
 void FIFO_swap(char *file_name, main_mem *, node_sm * head);
@@ -223,12 +225,26 @@ bool readMemory(page_table *page_tb, main_mem *main_m, int vir_page, int *readDa
     if( (current->next == NULL) && (current->data.virtualPage != vir_page) ){
         return false;
     }
-    if ( !(current->data.valid) ) {
-        return false;
-    }
     if(current->data.present){ //in main mem
         *readData = main_m->data[current->data.physicalPage];
         main_m->accessed[current->data.physicalPage] = true;
+        return true;
+    }
+    return false;
+}
+
+bool writeMemory(page_table *page_tb, main_mem *main_m, int vir_page, int writeData){
+    node_t * current = page_tb->head;
+    while( (current->next != NULL) && (current->data.virtualPage != vir_page) ){
+        current = current->next;
+    }
+    if( (current->next == NULL) && (current->data.virtualPage != vir_page) ){
+        return false;
+    }
+    if(current->data.present){ //in main mem
+        main_m->data[current->data.physicalPage] = writeData;
+        main_m->accessed[current->data.physicalPage] = true;
+        main_m->dirty[current->data.physicalPage] = true;
         return true;
     }
     return false;
@@ -317,7 +333,7 @@ void remove_translation(page_table *pt, int vir_page){
 	return;
 }
 
-void swap_to_main(process_list *headPL, main_mem *main, int PID_leaving, int PID_arriving, int main_index){
+void swap(process_list *headPL, main_mem *main, int PID_leaving, int PID_arriving, int main_index){
     int tmpData = main->data[main_index];
     bool tmpDirty = main->dirty[main_index];
     bool tmpInSwap = main->inSwap[main_index];
