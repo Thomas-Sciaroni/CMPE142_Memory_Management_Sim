@@ -23,10 +23,14 @@ typedef struct _main_mem {
 } main_mem;
 
 typedef struct _swap_mem {
-    int *p_id;
-    int *vir_page;
-    page_mem *pages;
+    int p_id;
+    int vir_page;
 } swap_mem;
+
+typedef struct node {
+    swap_mem data;
+    struct node * next;
+} node_sm;
 
 typedef struct _page_table {
     int p_id; // process ID for page table
