@@ -11,7 +11,6 @@
 #define SWAP_MEMORY_AMT 1000
 
 typedef struct _page_mem {
-    int data;
     bool dirty;
     bool accessed;
 } page_mem;
@@ -23,14 +22,10 @@ typedef struct _main_mem {
 } main_mem;
 
 typedef struct _swap_mem {
-    int p_id;
-    int vir_page;
+    int *p_id;
+    int * vir_page;
+    page_mem *pages;
 } swap_mem;
-
-typedef struct node {
-    swap_mem data;
-    struct node * next;
-} node_sm;
 
 typedef struct _page_table {
     int p_id; // process ID for page table
@@ -60,16 +55,22 @@ void FIFO_swap(char *file_name, main_mem *, swap_mem *swap, page_table *);
 
 void LRU_swap(char *file_name, main_mem *, swap_mem *swap);
 
-void random_swap(char *file_name, main_mem *, swap_mem *swap);
+void random_swap(char *file_name, main_mem *, swap_mem *swap,page_table *);
 
 bool main_full(main_mem *);
 
 int main() {
+	
 
     main_mem *main_memory = (main_mem *) (malloc(sizeof(main_mem)));
     main_memory->p_id = ((int *) malloc(sizeof(int) * PAGE_AMT));
     main_memory->vir_page = ((int *) malloc(sizeof(int) * PAGE_AMT));
     main_memory->pages = ((page_mem *) malloc(sizeof(page_mem) * PAGE_AMT));
+	
+    swap_mem *swap_memory = (swap_mem *) (malloc(sizeof(swap_mem)));
+    swap_memory-> p_id = ((int *) malloc(sizeof(int) * SWAP_MEMORY_AMT));
+    swap_memory->vir_page = ((int *) malloc(sizeof(int) * SWAP_MEMORY_AMT));
+    swap_memory->pages =((page_mem *)malloc(sizeof(int) * SWAP_MEMORY_AMT));
 
 
     page_table *pt = (page_table *) (malloc(sizeof(page_table) * SWAP_MEMORY_AMT));
@@ -78,14 +79,20 @@ int main() {
     for(int i = 0; i<SWAP_MEMORY_AMT; i++){
 	    swap_memory->p_id[i] = -1;
 	    //initialize the page tables variables 
-	    pt[i]->translations = ((int *) malloc(sizeof(int)*PAGE_AMT));
-	    pt[i]->valid = ((bool *) malloc(sizeof(bool) * PAGE_AMT));
-	    pt[i]->present = ((bool *) malloc(sizeof(bool) * PAGE_AMT));
+	    pt[i].translations = ((int *) malloc(sizeof(int)*PAGE_AMT));
+	    pt[i].valid = ((bool *) malloc(sizeof(bool) * PAGE_AMT));
+	    pt[i].present = ((bool *) malloc(sizeof(bool) * PAGE_AMT));
 	    pt[i].p_id = -1;
+	    for(int j=0; j<PAGE_AMT; j++){
+		pt[i].translations[j] = -1;
+		pt[i].valid[j] = false;
+		pt[i].present[j]=false;
+	    }
     }
     for(int i =0; i<PAGE_AMT; i++){
 	main_memory->p_id[i] = -1;
     }
+
     
 
     char file_name[32] = "memory.dat";
@@ -145,13 +152,22 @@ void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory, 
 			for(int i = 0; i<PAGE_AMT; i++){
 				if(main_memory->p_id[i] == p_id){
 					main_memory->p_id[i] = -1;
-					main_memory->pages[i].data =-1;
+					main_memory->vir_page[i] = -1;
+					
 					main_memory->pages[i].dirty =false;
 					main_memory->pages[i].accessed = false;
 
 				}
 			}
 			for(int i = 0; i<SWAP_MEMORY_AMT; i++){
+				//clears process conents from swap memory if it is there and clears the necessary page table
+				if(swap_memory->p_id[i] == p_id){
+					swap_memory->p_id[i] = -1;
+					swap_memory->vir_page[i] = -1;
+			
+					swap_memory->pages[i].dirty = false;
+					swap_memory->pages[i].accessed = false;
+				}
 				if(pt[i].p_id = p_id){
 					pt[i].p_id = -1;
 					pt[i].valid = false;
@@ -161,6 +177,13 @@ void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory, 
 		}
 	}
 	else{
+
+		if(main_full(main_memory) && operation == 'A'){
+			int num = (rand() % 20);
+			main_to_swap(pt,swap_memory,main_memory,num);
+			allocateMemory(pt,swap_memory,main_memory,v_id,operation);
+			
+		}
 		if(operation == 'W' || operation == 'R'){
 			bool access = accessMemory(pt,main_memory,v_id,operation);
 			if (access){
@@ -170,23 +193,35 @@ void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory, 
 		else if(operation == 'A' || operation == 'F'){
 			bool success = allocateMemory(pt, swap_memory,main_memory,v_id, operation);
 			if(success){
-				continue;
-			}
-		
-		else{
-			//swap function 
-			//find random page number in main memory
-			int num = (rand() % 20);
-			main_to_swap(pt,swap_memory,main_memory,num);
-			main_memory->p_id[num] = p_id;
-			main_memory->vir_page = v_id;
-			
-		}
+				continue;}
 		}
 
 	}
 
     }
+    for(int i=0; i<1000; i++){
+	    if(pt[i].p_id != -1){
+		    printf("Process %d \n",pt[i].p_id);
+		   for(int j=0; j<20; j++){
+			if(pt[i].translations[j] != -1)
+				printf("Virtual %d	Physical %d",j,pt[i].translations[j]);
+		   }
+		
+	    }
+
+	    if(swap_memory->p_id[i] != -1)
+		    printf("Swap \n Process %d     Virtual %d \n",swap_memory->p_id[i], swap_memory->vir_page[i]);
+
+    }
+
+    for(int i=0; i<20; i++){
+	if(main_memory->p_id[i] == -1)
+		printf("%d     free \n",i);
+	else
+		printf("%d     process %d \n",i,main_memory->p_id[i]);
+
+    }
+    
 }
 
 //only use for reading/writing
@@ -194,12 +229,10 @@ bool accessMemory(page_table *page_tb, main_mem *main_m, int vir_page, char oper
     if (!(page_tb->present[vir_page] && page_tb->valid[vir_page]))
         return false;
     if (operation == 'R') {
-        //just read the data, no need to do anything with it
-        int temp = main_m->pages[page_tb->translations[vir_page]].data;
 	main_m->pages[page_tb->translations[vir_page]].accessed = true;
         return true;
     } else if (operation == 'W') {
-        main_m->pages[page_tb->translations[vir_page]].data = 1;
+        
         main_m->pages[page_tb->translations[vir_page]].dirty = true;
         return true;
     } else return false;
@@ -220,7 +253,6 @@ bool allocateMemory(page_table *page_tb, swap_mem *swap_m, main_mem *main_m, int
                 main_m->p_id[i] = page_tb->p_id;
                 main_m->vir_page[i] = vir_page;
                 main_m->pages[i].dirty = false;
-                main_m->pages[i].data = 0;
                 add_translation(page_tb, vir_page, i);
                 return true;
             } else if (!(main_m->pages[i].dirty)) {
@@ -232,7 +264,7 @@ bool allocateMemory(page_table *page_tb, swap_mem *swap_m, main_mem *main_m, int
             main_m->p_id[index] = page_tb->p_id;
             main_m->vir_page[index] = vir_page;
             main_m->pages[index].dirty = false;
-            main_m->pages[index].data = 0;
+           
             add_translation(page_tb, vir_page, index);
         } else return false;
     } else if (operation == 'F') {
@@ -243,7 +275,7 @@ bool allocateMemory(page_table *page_tb, swap_mem *swap_m, main_mem *main_m, int
                 main_m->p_id[i] = -1;
                 main_m->vir_page[i] = -1;
                 main_m->pages[i].dirty = false;
-                main_m->pages[i].data = 0;
+               
                 remove_translation(page_tb,vir_page);
                 return true;
             }
@@ -253,7 +285,7 @@ bool allocateMemory(page_table *page_tb, swap_mem *swap_m, main_mem *main_m, int
                 swap_m->p_id[i] = -1;
                 swap_m->vir_page[i] = -1;
                 swap_m->pages[i].dirty = false;
-                swap_m->pages[i].data = 0;
+                
                 remove_translation(page_tb,vir_page);
                 return true;
             }
@@ -265,20 +297,8 @@ bool allocateMemory(page_table *page_tb, swap_mem *swap_m, main_mem *main_m, int
 
 //assumes you checked that all pages are taken first
 int unmodified_pages(main_mem *mem ){
-	int i = 0;
-	for(i; i<20; i++){
-		//tests if page has been modified 
-		if(mem->pages[i].dirty ==false && mem->pages[i].accessed == false){
-			//return page number if page is unmodified 
-			return i;
-		}
-
-		else{
-			return -1;
-		}
-	}
 	
-}
+	}
 
 void add_translation(page_table *pt,int vir_page, int phys_page){
 	pt->translations[vir_page] = phys_page;
@@ -307,9 +327,15 @@ void main_to_swap(page_table *pt, swap_mem *swap, main_mem *main,int index){
 	//copy contents to swap memory
 	swap->p_id[swap_index] = main->p_id[index];
 	swap->vir_page[swap_index] = main->vir_page[index];
-	swap->pages[swap_index].data = main->pages[index].data;
 	swap->pages[swap_index].dirty = main->pages[index].dirty;
 	swap->pages[swap_index].accessed = main->pages[index].accessed;
+
+	for(int i = 0; i<1000; i++){
+		if(pt[i].p_id == main->p_id[index]){
+			pt[i].p_id == -1;
+		}
+	}
+
 
 }
 
@@ -327,7 +353,6 @@ void swap_to_main(page_table *pt, swap_mem *swap, main_mem *main, int index){
 	//copy contents to main memory
 	main->p_id[main_index] = swap->p_id[index];
 	main->vir_page[main_index] = swap->vir_page[index];
-	main->pages[main_index].data = swap->pages[index].data;
 	main->pages[main_index].dirty = swap->pages[index].dirty;
 	main->pages[main_index].accessed = swap->pages[index].accessed;
 
@@ -335,7 +360,7 @@ void swap_to_main(page_table *pt, swap_mem *swap, main_mem *main, int index){
 
 bool main_full(main_mem *main){
 	for(int i = 0; i<PAGE_AMT; i++){
-		if(mem->p_id[i] == -1)
+		if(main->p_id[i] == -1)
 			return false;
 		else 
 			return true;
