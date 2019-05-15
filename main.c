@@ -288,17 +288,23 @@ bool freeMemory(page_table *page_tb, node_sm *swapHead, main_mem *main_m, int vi
     return false;
 }
 
-void add_translation(page_table *pt,int vir_page, int phys_page){
+void add_translation(page_table *pt, int vir_page, int phys_page){
     node_t * current = pt->head;
-    while( (current->next != NULL) ){
+    while( (current->next != NULL) && current->next->data.virtualPage != vir_page){
         current = current->next;
     }
-    current->next = malloc(sizeof(node_t));
-    current->next->data.virtualPage = vir_page;
-    current->next->data.physicalPage = phys_page;
-    current->next->data.present = true;
-    current->next->next = NULL;
-	return;
+    if(current->next->data.virtualPage == vir_page){ //update old mapping
+        current->next->data.physicalPage = phys_page;
+        current->next->data.present = true;
+    }
+    else{//add new mapping
+        current->next = malloc(sizeof(node_t));
+        current->next->data.virtualPage = vir_page;
+        current->next->data.physicalPage = phys_page;
+        current->next->data.present = true;
+        current->next->next = NULL;
+        return;
+    }
 }
 
 void remove_translation(page_table *pt, int vir_page){
@@ -306,9 +312,8 @@ void remove_translation(page_table *pt, int vir_page){
     while( (current->next->data.virtualPage != vir_page) ){
         current = current->next;
     }
-    node_t * tmp = current->next->next;
-    free(current->next);
-    current->next = tmp;
+    current->next->data.present = false;
+    current->next->data.physicalPage = -1;
 	return;
 }
 
