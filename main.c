@@ -33,7 +33,6 @@ typedef struct _node_sm {
 typedef struct _translation {
     int virtualPage;
     int physicalPage;
-    bool valid;
     bool present;
 } translation;
 
@@ -290,12 +289,26 @@ bool freeMemory(page_table *page_tb, node_sm *swapHead, main_mem *main_m, int vi
 }
 
 void add_translation(page_table *pt,int vir_page, int phys_page){
-	pt->translations[vir_page] = phys_page;
+    node_t * current = pt->head;
+    while( (current->next != NULL) ){
+        current = current->next;
+    }
+    current->next = malloc(sizeof(node_t));
+    current->next->data.virtualPage = vir_page;
+    current->next->data.physicalPage = phys_page;
+    current->next->data.present = true;
+    current->next->next = NULL;
 	return;
 }
 
 void remove_translation(page_table *pt, int vir_page){
-	pt->translations[vir_page] = -1;
+    node_t * current = pt->head;
+    while( (current->next->data.virtualPage != vir_page) ){
+        current = current->next;
+    }
+    node_t * tmp = current->next->next;
+    free(current->next);
+    current->next = tmp;
 	return;
 }
 
