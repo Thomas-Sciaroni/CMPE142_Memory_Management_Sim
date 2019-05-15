@@ -64,21 +64,21 @@ void mainDealloc(main_mem *);
 
 void swapDealloc(node_sm *);
 
-void add_translation(page_table*, int vir_page, int phys_page);
+void add_translation(process_list *pl, int PID,  int vir_page, int phys_page);
 
-void remove_translation(page_table *, int vir_page);
+void remove_translation(process_list *pl, int PID, int vir_page);
 
-bool readMemory(page_table *, main_mem *, int vir_page, int*);
+bool readMemory(process_list *pl, main_mem *main_m, int PID, int vir_page, int* readData);
 
-bool writeMemory(page_table *, main_mem*, int vir_page, int writeData);
+bool writeMemory(process_list *pl, main_mem *main_m, int PID, int vir_page, int writeData);
 
-bool allocateMemory(page_table *, node_sm *, main_mem *, int vir_page);
+bool allocateMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID, int vir_page);
 
-bool freeMemory(page_table *, node_sm *, main_mem *, int vir_page);
+bool freeMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID, int vir_page);
 
-void swap(page_table *pt, node_sm *head, main_mem *main, int vir_page, int main_index);
+void swapDirty(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID1, int virPage1, int PID2, int virPage2, int main_index);
 
-void
+void swapClean(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID, int vir_page, int main_index);
 
 
 //void run_processes(char * file_name, void(*swag_alg))
@@ -89,11 +89,8 @@ void LRU_swap(char *file_name, main_mem *, node_sm * head);
 void random_swap(char *file_name, main_mem *, node_sm * head);
 
 int main() {
-    main_mem *main_memory;
+    main_mem *main_memory = NULL;
     node_sm *headSM = NULL;
-
-
-
 
     char file_name[32] = "memory.dat";
     FILE *f;
@@ -106,21 +103,21 @@ int main() {
     mainInit(main_memory);
     swapInit(headSM);
     printf("Random Swap: \n");
-    random_swap(file_name, main_memory, headSM)
+    random_swap(file_name, main_memory, headSM);
     mainDealloc(main_memory);
     swapDealloc(headSM);
 
     mainInit(main_memory);
     swapInit(headSM);
     printf("LRU Swap: \n");
-    // LRU_swap(file_name, main_memory, headSM)
+    // LRU_swap(file_name, main_memory, headSM);
     mainDealloc(main_memory);
     swapDealloc(headSM);
 
     mainInit(main_memory);
     swapInit(headSM);
     printf("FIFO Swap: \n");
-    // FIFO_swap(file_name, main_memory, headSM)
+    // FIFO_swap(file_name, main_memory, headSM);
     mainDealloc(main_memory);
     swapDealloc(headSM);
 
@@ -217,8 +214,12 @@ void random_swap(char *file_name, main_mem *main_memory, node_sm * swapHead) {
 }
 
 //only use for reading/writing
-bool readMemory(page_table *page_tb, main_mem *main_m, int vir_page, int *readData) {
-    node_t * current = page_tb->head;
+bool readMemory(process_list *pl, main_mem *main_m, int PID, int vir_page, int* readData) {
+    process_list * currentPL = pl;
+    while(currentPL->next->pageTable->p_id != PID){
+        currentPL = currentPL->next;
+    }
+    node_t * current = currentPL->next->pageTable->head;
     while( (current->next != NULL) && (current->data.virtualPage != vir_page) ){
         current = current->next;
     }
@@ -233,8 +234,12 @@ bool readMemory(page_table *page_tb, main_mem *main_m, int vir_page, int *readDa
     return false;
 }
 
-bool writeMemory(page_table *page_tb, main_mem *main_m, int vir_page, int writeData){
-    node_t * current = page_tb->head;
+bool writeMemory(process_list *pl, main_mem *main_m, int PID, int vir_page, int writeData){
+    process_list * currentPL = pl;
+    while(currentPL->next->pageTable->p_id != PID){
+        currentPL = currentPL->next;
+    }
+    node_t * current = currentPL->next->pageTable->head;
     while( (current->next != NULL) && (current->data.virtualPage != vir_page) ){
         current = current->next;
     }
@@ -257,20 +262,37 @@ bool writeMemory(page_table *page_tb, main_mem *main_m, int vir_page, int writeD
 
 //TODO: CHECK PAGE TABLE FOR VALID TRANSLATION
 
-bool allocateMemory(page_table *page_tb, node_sm * swapHead, main_mem *main_m, int vir_page) {
-    node_t * current = page_tb->head;
+bool allocateMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID, int vir_page) {
+    process_list * currentPL = pl;
+    while(currentPL->next->pageTable->p_id != PID){
+        currentPL = currentPL->next;
+    }
+    node_t * current = currentPL->next->pageTable->head;
     int index = -1;
     for(int i = 0; i != PAGE_AMT; ++i){
         if(main_m->p_id[i] == -1){
-            index = main_m->p_id[i];
+            index = i;
             break;
         }
     }
     if(index == -1){ //main mem full
-        swap()
+        for(int i = 0; i != PAGE_AMT; ++i){
+            if(main_m->dirty[i] == false){
+                index = i;
+                break;
+            }
+        }
+        if(index != -1){
+            swapClean(pl, swapHead, main_m, PID, vir_page, index);
+            return true;
+        }
+        else{
+            return false;
+        }
+
     }
     else{
-        main_m->p_id[index] = page_tb->p_id;
+        main_m->p_id[index] = currentPL->next->pageTable->p_id;
         main_m->data[index] = 0;
         main_m->inSwap[index] = false;
         main_m->dirty[index] = false;
@@ -278,7 +300,7 @@ bool allocateMemory(page_table *page_tb, node_sm * swapHead, main_mem *main_m, i
     }
 }
 
-bool freeMemory(page_table *page_tb, node_sm *swapHead, main_mem *main_m, int vir_page){
+bool freeMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID, int vir_page){
     if(!(page_tb->valid[vir_page]))
         return false;
     for (int i = 0; i < PAGE_AMT; i++) {
@@ -304,8 +326,12 @@ bool freeMemory(page_table *page_tb, node_sm *swapHead, main_mem *main_m, int vi
     return false;
 }
 
-void add_translation(page_table *pt, int vir_page, int phys_page){
-    node_t * current = pt->head;
+void add_translation(process_list *pl, int PID,  int vir_page, int phys_page){
+    process_list * currentPL = pl;
+    while(currentPL->next->pageTable->p_id != PID){
+        currentPL = currentPL->next;
+    }
+    node_t * current = currentPL->next->pageTable->head;
     while( (current->next != NULL) && current->next->data.virtualPage != vir_page){
         current = current->next;
     }
@@ -323,24 +349,39 @@ void add_translation(page_table *pt, int vir_page, int phys_page){
     }
 }
 
-void remove_translation(page_table *pt, int vir_page){
-    node_t * current = pt->head;
+void remove_translation(process_list *pl, int PID,  int vir_page){
+    process_list * currentPL = pl;
+    while(currentPL->next->pageTable->p_id != PID){
+        currentPL = currentPL->next;
+    }
+    node_t * current = currentPL->next->pageTable->head;
     while( (current->next->data.virtualPage != vir_page) ){
         current = current->next;
     }
     current->next->data.present = false;
     current->next->data.physicalPage = -1;
-	return;
 }
 
-void swap(process_list *headPL, main_mem *main, int PID_leaving, int PID_arriving, int main_index){
+//puts virPage1 into main mem, virPage2 into swap
+void swapDirty(process_list *pl, node_sm * swapHead, main_mem *main, int PID1, int virPage1, int PID2, int virPage2, int main_index){
     int tmpData = main->data[main_index];
-    bool tmpDirty = main->dirty[main_index];
     bool tmpInSwap = main->inSwap[main_index];
 
+    process_list * currentPL = pl;
+    while(currentPL->next->pageTable->p_id != PID1){
+        currentPL = currentPL->next;
+    }
+    node_t * pt1 = currentPL->next->pageTable->head;
+
+    currentPL = pl;
+    while(currentPL->next->pageTable->p_id != PID2){
+        currentPL = currentPL->next;
+    }
+    node_t * pt2 = currentPL->next->pageTable->head;
+
     //get the values out of swap and into main mem
-    node_sm * current = headSM;
-    while( (current->next != NULL) && (current->data.p_id != vir_page) ){
+    node_sm * current = swapHead;
+    while( (current->next != NULL) && !( (current->data.p_id == pt1->p_id ) && (current->data.vir_page == virPage1) ) ){
         current = current->next;
     }
     main->data[main_index] = current->data.data;
@@ -349,16 +390,14 @@ void swap(process_list *headPL, main_mem *main, int PID_leaving, int PID_arrivin
     main->inSwap[main_index] = true;
 
     if(tmpInSwap){ //There is an old page
-        if(tmpDirty) { //Need to find the old page and replace data
-            node_sm * oldpage = head;
-            while ((oldpage->next != NULL)) {
-                oldpage = oldpage->next;
-            }
-            oldpage->data.data = tmpData;
+        node_sm * oldpage = swapHead;
+        while ((oldpage->next != NULL)) {
+            oldpage = oldpage->next;
         }
+        oldpage->data.data = tmpData;
     }
-    else { //No old page, just create a new entry in swap linked list
-        node_sm * cur = head;
+    else { //No old page, juSMst create a new entry in swap linked list
+        node_sm * cur = swapHead;
         while ((cur->next != NULL)) {
             cur = cur->next;
         }
