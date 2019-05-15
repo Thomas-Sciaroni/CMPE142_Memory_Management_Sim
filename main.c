@@ -56,6 +56,11 @@ typedef struct _LRU_queue {
     struct _LRU_queue * next;
 } node_lq;
 
+typedef struct _kill_list {
+    int PID;
+    struct _kill_list * next;
+} node_kl;
+
 void mainInit(main_mem *);
 
 void swapInit(node_sm *);
@@ -64,33 +69,42 @@ void mainDealloc(main_mem *);
 
 void swapDealloc(node_sm *);
 
+void killInit(node_kl *);
+
+void killDealloc(node_kl *);
+
 void add_translation(process_list *pl, int PID,  int vir_page, int phys_page);
 
 void remove_translation(process_list *pl, int PID, int vir_page);
 
-bool readMemory(process_list *pl, main_mem *main_m, int PID, int vir_page, int* readData);
+bool readMemory(process_list *pl, main_mem *main_m, node_kl *kl, int PID, int vir_page, int* readData);
 
-bool writeMemory(process_list *pl, main_mem *main_m, int PID, int vir_page, int writeData);
+bool writeMemory(process_list *pl, main_mem *main_m, node_kl *kl, int PID, int vir_page, int writeData);
 
 bool allocateMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID, int vir_page);
 
-bool freeMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID, int vir_page);
+bool freeMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, node_kl *kl, int PID, int vir_page);
 
-void swapDirty(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID1, int virPage1, int PID2, int virPage2, int main_index);
+void swapDirty(process_list *pl, node_sm * swapHead, main_mem *main, int PID1, int virPage1, int PID2, int virPage2, int main_index);
 
-void swapClean(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID, int vir_page, int main_index);
+void swapClean(process_list *pl, node_sm * swapHead, main_mem *main, int PID, int vir_page, int main_index);
+
+void kill(node_kl *kl, int PID);
+
+int lowestCleanPage(main_mem *);
 
 
 //void run_processes(char * file_name, void(*swag_alg))
-void FIFO_swap(char *file_name, main_mem *, node_sm * head);
+void FIFO_swap(char *file_name, main_mem *, node_sm * headSM, node_kl *headKL);
 
-void LRU_swap(char *file_name, main_mem *, node_sm * head);
+void LRU_swap(char *file_name, main_mem *, node_sm * headSM, node_kl *headKL);
 
-void random_swap(char *file_name, main_mem *, node_sm * head);
+void random_swap(char *file_name, main_mem *, node_sm * headSM, node_kl *headKL);
 
 int main() {
     main_mem *main_memory = NULL;
     node_sm *headSM = NULL;
+    node_kl *headKL = NULL
 
     char file_name[32] = "memory.dat";
     FILE *f;
@@ -102,22 +116,28 @@ int main() {
 
     mainInit(main_memory);
     swapInit(headSM);
+    killInit(headKL);
     printf("Random Swap: \n");
-    random_swap(file_name, main_memory, headSM);
+    //random_swap(file_name, main_memory, headSM, headKL);
+    killDealloc(headKL);
     mainDealloc(main_memory);
     swapDealloc(headSM);
 
     mainInit(main_memory);
     swapInit(headSM);
+    killInit(headKL);
     printf("LRU Swap: \n");
-    // LRU_swap(file_name, main_memory, headSM);
+    // LRU_swap(file_name, main_memory, headSM, headKL);
+    killDealloc(headKL);
     mainDealloc(main_memory);
     swapDealloc(headSM);
 
     mainInit(main_memory);
     swapInit(headSM);
+    killInit(headKL);
     printf("FIFO Swap: \n");
-    // FIFO_swap(file_name, main_memory, headSM);
+    // FIFO_swap(file_name, main_memory, headSM, headKL);
+    killDealloc(headKL);
     mainDealloc(main_memory);
     swapDealloc(headSM);
 
@@ -214,7 +234,7 @@ void random_swap(char *file_name, main_mem *main_memory, node_sm * swapHead) {
 }
 
 //only use for reading/writing
-bool readMemory(process_list *pl, main_mem *main_m, int PID, int vir_page, int* readData) {
+bool readMemory(process_list *pl, main_mem *main_m, node_kl *kl, int PID, int vir_page, int* readData) {
     process_list * currentPL = pl;
     while(currentPL->next->pageTable->p_id != PID){
         currentPL = currentPL->next;
@@ -224,6 +244,7 @@ bool readMemory(process_list *pl, main_mem *main_m, int PID, int vir_page, int* 
         current = current->next;
     }
     if( (current->next == NULL) && (current->data.virtualPage != vir_page) ){
+        kill(kl, PID);
         return false;
     }
     if(current->data.present){ //in main mem
@@ -234,7 +255,7 @@ bool readMemory(process_list *pl, main_mem *main_m, int PID, int vir_page, int* 
     return false;
 }
 
-bool writeMemory(process_list *pl, main_mem *main_m, int PID, int vir_page, int writeData){
+bool writeMemory(process_list *pl, main_mem *main_m, node_kl *kl, int PID, int vir_page, int writeData){
     process_list * currentPL = pl;
     while(currentPL->next->pageTable->p_id != PID){
         currentPL = currentPL->next;
@@ -244,6 +265,7 @@ bool writeMemory(process_list *pl, main_mem *main_m, int PID, int vir_page, int 
         current = current->next;
     }
     if( (current->next == NULL) && (current->data.virtualPage != vir_page) ){
+        kill(kl, PID);
         return false;
     }
     if(current->data.present){ //in main mem
@@ -300,7 +322,7 @@ bool allocateMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, int 
     }
 }
 
-bool freeMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID, int vir_page){
+bool freeMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, node_kl *kl, int PID, int vir_page){
     process_list * currentPL = pl;
     while(currentPL->next->pageTable->p_id != PID){
         currentPL = currentPL->next;
@@ -327,7 +349,7 @@ bool freeMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID,
                 currentSM = currentSM->next;
             }
             if(currentSM->next == NULL){
-                kill(PID);
+                kill(kl, PID);
             }
             else{
                 node_sm *tmp = currentSM->next->next;
@@ -504,4 +526,38 @@ void swapDealloc(node_sm* head){
         free(delete);
     }
     free(current);
+}
+
+void killInit(node_kl *head){
+    head = malloc(sizeof(node_sm));
+    head->PID = -1;
+    head->next = NULL;
+}
+
+void killDealloc(node_kl* head){
+    node_kl * current = head;
+    node_kl * delete;
+    while(current->next != NULL){
+        delete = current;
+        current = current->next;
+        free(delete);
+    }
+    free(current);
+}
+
+void kill(node_kl *kl, int PID){
+    kl->next = malloc(sizeof(node_kl));
+    kl->next->PID = PID;
+    kl->next->next = NULL;
+}
+
+int lowestCleanPage(main_mem * main){
+    int index = -1;
+    for(int i = 0; i != PAGE_AMT; ++i){
+        if(main->dirty[i] == -1){
+            index = i;
+            break;
+        }
+    }
+    return index;
 }
