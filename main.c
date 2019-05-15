@@ -8,23 +8,20 @@
 #include <stdbool.h>
 
 #define PAGE_AMT 20
-#define SWAP_MEMORY_AMT 1000
-
-typedef struct _page_mem {
-    int data;
-    bool dirty;
-    bool accessed;
-} page_mem;
+#define PAGE_TABLE_DEFAULT_SIZE 1000
 
 typedef struct _main_mem {
     int *p_id;
     int *vir_page;
-    page_mem *pages;
+    int *data;
+    bool *dirty;
+    bool *accessed;
 } main_mem;
 
 typedef struct _swap_mem {
     int p_id;
     int vir_page;
+    int data;
 } swap_mem;
 
 typedef struct node {
@@ -56,11 +53,11 @@ void clear_pages(swap_mem *, main_mem *, int page_amt);
 int unmodified_pages(main_mem *);
 
 //void run_processes(char * file_name, void(*swag_alg))
-void FIFO_swap(char *file_name, main_mem *, swap_mem *swap);
+void FIFO_swap(char *file_name, main_mem *, node_sm head);
 
-void LRU_swap(char *file_name, main_mem *, swap_mem *swap);
+void LRU_swap(char *file_name, main_mem *, node_sm head);
 
-void random_swap(char *file_name, main_mem *, swap_mem *swap);
+void random_swap(char *file_name, main_mem *, node_sm head);
 
 int main() {
 
@@ -69,19 +66,20 @@ int main() {
     main_memory->vir_page = ((int *) malloc(sizeof(int) * PAGE_AMT));
     main_memory->pages = ((page_mem *) malloc(sizeof(page_mem) * PAGE_AMT));
 
-    swap_mem *swap_memory = (swap_mem *) (malloc(sizeof(swap_mem)));
-    swap_memory->p_id = ((int *) malloc(sizeof(int) * SWAP_MEMORY_AMT));
-    swap_memory->vir_page = ((int *) malloc(sizeof(int) * SWAP_MEMORY_AMT));
-    swap_memory->pages = ((page_mem *) malloc(sizeof(page_mem) * SWAP_MEMORY_AMT));
 
-    page_table *pt = (page_table *) (malloc(sizeof(page_table) * SWAP_MEMORY_AMT));
-    
-    for(int i = 0; i<SWAP_MEMORY_AMT; i++){
-	    swap_memory->p_id[i] = -1;
-	    pt[i].p_id = -1;
+    node_sm * head = NULL;
+    head = malloc(sizeof(node_sm));
+    if (head == NULL) {
+        printf("head malloc failed for swap memory");
+        exit(1);
     }
+    head->data.p_id = -1;
+    head->next = NULL;
+
+    page_table *pt = (page_table *) (malloc(sizeof(page_table) * PAGE_TABLE_DEFAULT_SIZE));
+
     for(int i =0; i<PAGE_AMT; i++){
-	main_memory->p_id[i] = -1;
+	    main_memory->p_id[i] = -1;
     }
     
 
@@ -93,12 +91,12 @@ int main() {
     }
     fclose(f);
 
-    // random_swap(file_name, main_memory, swap_memory)
+    // random_swap(file_name, main_memory, head)
     return 0;
 
 }
 
-void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory) {
+void random_swap(char *file_name, main_mem *main_memory, node_sm head) {
     char line[100];
     char *token;
     FILE *f;
@@ -201,7 +199,7 @@ bool allocateMemory(page_table *page_tb, swap_mem *swap_m, main_mem *main_m, int
                 return true;
             }
         }
-        for (int i = 0; i < SWAP_MEMORY_AMT; i++) {
+        for (int i = 0; i < PAGE_TABLE_DEFAULT_SIZE; i++) {
             if (swap_m->p_id[i] == page_tb->p_id) {
                 swap_m->p_id[i] = -1;
                 swap_m->vir_page[i] = -1;
