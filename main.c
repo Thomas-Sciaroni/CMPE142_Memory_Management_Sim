@@ -70,6 +70,16 @@ int main() {
     swap_memory->vir_page = ((int *) malloc(sizeof(int) * SWAP_MEMORY_AMT));
     swap_memory->pages = ((page_mem *) malloc(sizeof(page_mem) * SWAP_MEMORY_AMT));
 
+    page_table *pt = (page_table *) (malloc(sizeof(page_table) * SWAP_MEMORY_AMT));
+    
+    for(int i = 0; i<SWAP_MEMORY_AMT; i++){
+	    swap_memory->p_id[i] = -1;
+	    pt[i].p_id = -1;
+    }
+    for(int i =0; i<PAGE_AMT; i++){
+	main_memory->p_id[i] = -1;
+    }
+    
 
     char file_name[32] = "memory.dat";
     FILE *f;
@@ -96,6 +106,7 @@ void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory) 
     while (fgets(line, 100, f)) {
         token = strtok(line, " \t\n");
         incrementer = 0;
+	v_id = -1;
         while (token != NULL) {
             if (incrementer == 0) {
                 p_id = atoi(token);
@@ -106,14 +117,24 @@ void random_swap(char *file_name, main_mem *main_memory, swap_mem *swap_memory) 
             } else {
                 v_id = atoi(token);
             }
-            if (incrementer < 2) {
-                v_id = -1;
-            };
-            //DATA IS IN p_id
-            //initilize page table if new ID
-
+           
             token = strtok(NULL, " \t\n");
         }
+
+	//process the line 
+
+	//check if the operation is process creation or termination
+	if(v_id == -1){
+		//check if operation is creation of process
+		if(operation == 'C'){
+			//create page table for process
+			
+		}
+		else{
+
+		}
+	}
+
     }
 }
 
