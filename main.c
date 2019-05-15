@@ -301,29 +301,44 @@ bool allocateMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, int 
 }
 
 bool freeMemory(process_list *pl, node_sm * swapHead, main_mem *main_m, int PID, int vir_page){
-    if(!(page_tb->valid[vir_page]))
+    process_list * currentPL = pl;
+    while(currentPL->next->pageTable->p_id != PID){
+        currentPL = currentPL->next;
+    }
+    node_t * currentT = currentPL->next->pageTable->head;
+    while( (currentT->next != NULL) && currentT->next->data.virtualPage != vir_page){
+        currentT = currentT->next;
+    }
+    if(currentT->next == NULL){
         return false;
-    for (int i = 0; i < PAGE_AMT; i++) {
-        if (main_m->p_id[i] == page_tb->p_id) {
-            main_m->p_id[i] = -1;
-            main_m->vir_page[i] = -1;
-            main_m->pages[i].dirty = false;
-            main_m->pages[i].data = 0;
-            remove_translation(page_tb,vir_page);
-            return true;
-        }
     }
-    for (int i = 0; i < PAGE_TABLE_DEFAULT_SIZE; i++) {
-        if (swap_m->p_id[i] == page_tb->p_id) {
-            swap_m->p_id[i] = -1;
-            swap_m->vir_page[i] = -1;
-            swap_m->pages[i].dirty = false;
-            swap_m->pages[i].data = 0;
-            remove_translation(page_tb,vir_page);
-            return true;
+    else{
+        if(currentT->next->data.present){ //clear main mem
+            int index = currentT->next->data.physicalPage;
+            main_m->data[index] = 0;
+            main_m->p_id[index] = -1;
+            main_m->dirty[index] = false;
+            main_m->accessed[index] = false;
+            main_m->inSwap[index] = false;
         }
+        else{ //clear swap mem
+            node_sm * currentSM = swapHead;
+            while(currentSM->next != NULL && !( (currentSM->data.p_id == PID) && (currentSM->data.vir_page == vir_page) ) ){
+                currentSM = currentSM->next;
+            }
+            if(currentSM->next == NULL){
+                kill(PID);
+            }
+            else{
+                node_sm *tmp = currentSM->next->next;
+                free(currentSM->next);
+                currentSM->next = tmp;
+            }
+        }
+        node_t * tmp = currentT->next->next;
+        free(currentT->next);
+        currentT->next = tmp;
     }
-    return false;
 }
 
 void add_translation(process_list *pl, int PID,  int vir_page, int phys_page){
@@ -381,7 +396,7 @@ void swapDirty(process_list *pl, node_sm * swapHead, main_mem *main, int PID1, i
 
     //get the values out of swap and into main mem
     node_sm * current = swapHead;
-    while( (current->next != NULL) && !( (current->data.p_id == pt1->p_id ) && (current->data.vir_page == virPage1) ) ){
+    while( (current->next != NULL) && !( (current->data.p_id == PID1) && (current->data.vir_page == virPage1) ) ){
         current = current->next;
     }
     main->data[main_index] = current->data.data;
